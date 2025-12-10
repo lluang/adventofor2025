@@ -1,0 +1,141 @@
+---
+title: "Data Summary"
+format: html
+---
+
+## Overview
+
+This document reads and summarizes all CSV files located in the `data/` directory. It uses the `tidyverse` family of libraries for data handling.
+
+## Load Libraries
+
+```{r}
+#| label: load-libraries
+#| message: false
+
+library(tidyverse)
+```
+
+---
+
+## assets.csv
+
+### Summary of assets.csv
+
+```{r}
+#| label: summary-assets-csv
+read_csv("../data/assets.csv", show_col_types = FALSE) %>% summary()
+```
+
+### Plots for assets.csv
+
+```{r}
+#| label: plots-assets-csv
+#| fig-width: 8
+#| fig-height: 5
+data_assets <- read_csv("../data/assets.csv", show_col_types = FALSE)
+purrr::walk(names(data_assets), function(col_name) {
+  p <- ggplot(data_assets, aes(x = !!sym(col_name))) +
+    labs(title = paste("Distribution of", col_name, "in assets.csv"))
+  if (is.numeric(data_assets[[col_name]])) {
+    p <- p + geom_histogram(bins = 30, fill = "skyblue", color = "white")
+  } else {
+    p <- p + geom_bar(fill = "lightgreen") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  }
+  print(p)
+})
+```
+
+---
+
+## loan_profitability_per_quarter.csv
+
+### Summary of loan_profitability_per_quarter.csv
+
+```{r}
+#| label: summary-loan-profitability-per-quarter-csv
+read_csv("../data/loan_profitability_per_quarter.csv", show_col_types = FALSE) %>% summary()
+```
+
+### Plots for loan_profitability_per_quarter.csv
+
+```{r}
+#| label: plots-loan-profitability-per-quarter-csv
+#| fig-width: 8
+#| fig-height: 5
+data_loan_profitability <- read_csv("../data/loan_profitability_per_quarter.csv", show_col_types = FALSE)
+purrr::walk(names(data_loan_profitability), function(col_name) {
+  p <- ggplot(data_loan_profitability, aes(x = !!sym(col_name))) +
+    labs(title = paste("Distribution of", col_name, "in loan_profitability_per_quarter.csv"))
+  if (is.numeric(data_loan_profitability[[col_name]])) {
+    p <- p + geom_histogram(bins = 30, fill = "skyblue", color = "white")
+  } else {
+    p <- p + geom_bar(fill = "lightgreen") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  }
+  print(p)
+})
+```
+
+---
+
+## segment_profitability_means.csv
+
+### Summary of segment_profitability_means.csv
+
+```{r}
+#| label: summary-segment-profitability-means-csv
+read_csv("../data/segment_profitability_means.csv", show_col_types = FALSE) %>% summary()
+```
+
+### Plots for segment_profitability_means.csv
+
+```{r}
+#| label: plots-segment-profitability-means-csv
+#| fig-width: 8
+#| fig-height: 5
+data_segment_profitability <- read_csv("../data/segment_profitability_means.csv", show_col_types = FALSE)
+purrr::walk(names(data_segment_profitability), function(col_name) {
+  p <- ggplot(data_segment_profitability, aes(x = !!sym(col_name))) +
+    labs(title = paste("Distribution of", col_name, "in segment_profitability_means.csv"))
+  if (is.numeric(data_segment_profitability[[col_name]])) {
+    p <- p + geom_histogram(bins = 30, fill = "skyblue", color = "white")
+  } else {
+    p <- p + geom_bar(fill = "lightgreen") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  }
+  print(p)
+})
+```
+
+---
+
+## segments.csv
+
+### Summary of segments.csv
+
+```{r}
+#| label: summary-segments-csv
+read_csv("../data/segments.csv", show_col_types = FALSE) %>% summary()
+```
+
+### Plots for segments.csv
+
+```{r}
+#| label: plots-segments-csv
+#| fig-width: 8
+#| fig-height: 5
+data_segments <- read_csv("../data/segments.csv", show_col_types = FALSE)
+purrr::walk(names(data_segments), function(col_name) {
+  p <- ggplot(data_segments, aes(x = !!sym(col_name))) +
+    labs(title = paste("Distribution of", col_name, "in segments.csv"))
+  if (is.numeric(data_segments[[col_name]])) {
+    p <- p + geom_histogram(bins = 30, fill = "skyblue", color = "white")
+  } else {
+    p <- p + geom_bar(fill = "lightgreen") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  }
+  print(p)
+})
+```

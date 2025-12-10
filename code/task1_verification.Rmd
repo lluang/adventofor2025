@@ -1,0 +1,59 @@
+---
+title: "Task 1: Profitability Verification"
+output: html_document
+---
+
+This document details the process of verifying the average profitability calculation.
+
+## 1. Load Data
+
+We start by loading the necessary libraries and the three CSV files: `loan_profitability_per_quarter.csv`, `segment_profitability_means.csv`, and `segments.csv`.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+```
+
+```{r load-data}
+loan_profitability <- read_csv("../data/loan_profitability_per_quarter.csv")
+segment_means <- read_csv("../data/segment_profitability_means.csv")
+segments <- read_csv("../data/segments.csv")
+
+# Rename the first column of segment_means, which is unnamed in the CSV
+segment_means <- segment_means %>% rename(segment_quality = ...1)
+```
+
+## 2. Calculate Average Profitability from Quarterly Data
+
+Now, we calculate the average profitability for each loan type from the `loan_profitability_per_quarter.csv` data. This file contains profitability data for each quarter. We will calculate the mean for each loan column.
+
+```{r calculate-averages}
+average_profitability <- loan_profitability %>%
+  select(-Quarter) %>%
+  summarise(across(everything(), mean))
+
+# Print the calculated averages
+kable(average_profitability)
+```
+
+## 3. Compare with segment_profitability_means.csv
+
+Let's look at the provided `segment_profitability_means.csv` data.
+
+```{r show-segment-means}
+kable(segment_means)
+```
+
+**Comparison and Methodology:**
+
+The `segment_profitability_means.csv` file contains profitability values broken down by a "segment_quality" (Prime, Standard, Substandard, Subprime), which is not present in the `loan_profitability_per_quarter.csv` file.
+
+The `average_profitability` table calculated above shows a single average profitability for each loan type across all quarters. Let's compare one of them. For `PersonalLoans`, our calculated average is `r round(average_profitability$PersonalLoans, 4)`. The values for `PersonalLoans` in `segment_means` are `r segment_means$PersonalLoans`.
+
+The numbers do not directly match. This is because the quarterly data is not segmented by quality tier. The `segment_profitability_means.csv` file must have been computed using a more granular dataset that included both quarterly results and segment quality information. The provided `loan_profitability_per_quarter.csv` seems to be an aggregated view that has lost the segment-level detail.
+
+**Conclusion on Methodology:** The methodology to get from `loan_profitability_per_quarter.csv` to `segment_profitability_means.csv` is not reproducible with the given data. It's likely that the original data was at a per-loan level, and was aggregated in two different ways to produce these two files. The `segment_profitability_means.csv` file seems to be the one we should use for segment-level profitability, as per the project description.
+
+I will now proceed with the next tasks.
+I'll create another Rmd file for Task 2.

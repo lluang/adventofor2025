@@ -1,0 +1,68 @@
+---
+title: "Cost Comparison Plot"
+output: html_document
+---
+
+This document generates a plot to compare risk_weight, rel_sell_cost, and rel_origination_cost for each asset in the segments data.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r cost-comparison-plot}
+# Read the data
+data_segments <- read_csv("../data/segments.csv")
+
+# Reshape the data to a long format
+data_long <- data_segments %>%
+  select(asset, risk_weight, rel_sell_cost, rel_origination_cost) %>%
+  pivot_longer(cols = -asset, names_to = "metric", values_to = "value")
+
+# Create the plot
+ggplot(data_long, aes(x = asset, y = value, fill = metric)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Comparison of Costs and Risk Weight by Asset",
+    x = "Asset",
+    y = "Value",
+    fill = "Metric"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Exposure by Segment
+
+This plot compares the exposure for each segment, grouped by asset class.
+
+```{r exposure-plot}
+# The data is already loaded in the previous chunk, so we can reuse data_segments
+
+# Create the exposure plot by segment, faceted by asset
+ggplot(data_segments, aes(x = segment_id, y = exposure)) +
+  geom_col(fill = "purple") +
+  facet_grid(. ~ asset, scales = "free_x") +
+  labs(
+    title = "Exposure by Segment, Grouped by Asset",
+    x = "Segment",
+    y = "Exposure"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+```{r risk-weight-plot}
+# The data is already loaded in the previous chunk, so we can reuse data_segments
+
+# Create the exposure plot by segment, faceted by asset
+ggplot(data_segments, aes(x = segment_id, y = risk_weight)) +
+  geom_col(fill = "purple") +
+  facet_grid(. ~ asset, scales = "free_x") +
+  labs(
+    title = "Risk Weight by Segment, Grouped by Asset",
+    x = "Segment",
+    y = "risk_weight"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```

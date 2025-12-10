@@ -1,0 +1,12 @@
+/.quarto/
+**/*.quarto_ipynb
+OR_Using_R-master/
+ref/
+_output/
+*.html
+*.pdf
+*.png
+code/libs/
+code/summarize_data_files/
+code/cost_comparison_plot_files/    
+data/

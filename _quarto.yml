@@ -1,0 +1,19 @@
+# This file configures the Quarto project.
+# Learn more at https://quarto.org/docs/projects/
+
+project:
+  type: default
+  output-dir: _output
+
+# By default, Quarto finds and renders all .qmd files in the project.
+# Your 'code/abcfinancial.qmd' will be rendered automatically.
+# If you ever want to be more selective, you can uncomment and use the 'render' key:
+render:
+  - "code/abcfinancial.qmd"
+
+# You can define project-wide formats here.
+format:
+  html:
+    theme: cosmo
+    toc: true
+    embed-resources: true

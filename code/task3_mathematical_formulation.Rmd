@@ -1,0 +1,87 @@
+---
+title: "Task 3: Mathematical Formulation"
+output: html_document
+---
+
+This document outlines a draft mathematical formulation for the portfolio optimization problem.
+
+## 1. Decision Variables
+
+Let $S$ be the set of all loan segments (e.g., `PersonalLoans_Prime`, `HomeLoan_Standard`, etc.). For each segment $s \in S$, we need to decide the new exposure.
+
+Let:
+- $x_s$ be the new exposure (dollar amount) for segment $s \in S$.
+
+Alternatively, we can define variables for the change in exposure. Let $E_s$ be the current exposure for segment $s$. Then we can define:
+- $\Delta_s^+$: amount of new origination for segment $s$.
+- $\Delta_s^-$: amount of existing exposure to sell for segment $s$.
+
+The new exposure will then be $x_s = E_s + \Delta_s^+ - \Delta_s^-$. Using change variables is often better for expressing costs and limits on changes.
+
+So, our decision variables are:
+- $\Delta_s^+ \ge 0$: The dollar amount of new loans to originate for each segment $s \in S$.
+- $\Delta_s^- \ge 0$: The dollar amount of existing loans to sell from each segment $s \in S$.
+
+## 2. Objective Function
+
+The objective is to maximize the total portfolio profitability, net of transaction costs.
+
+Let:
+- $p_s$: the average profitability of segment $s$ (from `segment_profitability_means.csv`).
+- $c_s^{orig}$: the relative origination cost for segment $s$ (from `segments.csv`).
+- $c_s^{sell}$: the relative sell cost for segment $s$ (from `segments.csv`).
+
+The objective function is to maximize:
+
+$$ \sum_{s \in S} p_s \cdot (E_s + \Delta_s^+ - \Delta_s^-) - \sum_{s \in S} c_s^{orig} \cdot \Delta_s^+ - \sum_{s \in S} c_s^{sell} \cdot \Delta_s^- $$
+
+This is the total profit from the new portfolio composition, minus the costs of originating and selling assets.
+
+## 3. Constraints
+
+The decisions are subject to several constraints.
+
+### a. Exposure Change Constraints
+
+For each asset type $a$ (e.g., `PersonalLoans`), there are limits on how much the total exposure for that asset can change. Let $A$ be the set of asset types. Let $S_a \subset S$ be the set of segments belonging to asset type $a$.
+
+Let:
+- $I_a^{max}$: max exposure increase for asset $a$ (from `assets.csv`).
+- $D_a^{max}$: max exposure decrease for asset $a$ (from `assets.csv`).
+- $E_a^{total} = \sum_{s \in S_a} E_s$: total current exposure for asset $a$.
+
+For each asset type $a \in A$:
+
+- **Increase constraint:** The total amount of new originations for an asset cannot exceed the max increase limit.
+$$ \sum_{s \in S_a} \Delta_s^+ \le I_a^{max} \cdot E_a^{total} $$
+
+- **Decrease constraint:** The total amount of sold assets cannot exceed the max decrease limit.
+$$ \sum_{s \in S_a} \Delta_s^- \le D_a^{max} \cdot E_a^{total} $$
+
+- We can't sell more than we have in a segment
+$$ \Delta_s^- \le E_s $$
+
+### b. Regulatory Risk Constraint
+
+The weighted-average risk weight of the new portfolio must not exceed 50%.
+
+Let:
+- $w_s$: the risk weight for segment $s$ (from `segments.csv`).
+- $X^{total} = \sum_{s \in S} (E_s + \Delta_s^+ - \Delta_s^-)$: the total exposure of the new portfolio.
+
+The constraint is:
+$$ \frac{\sum_{s \in S} w_s \cdot (E_s + \Delta_s^+ - \Delta_s^-)}{X^{total}} \le 0.5 $$
+
+This can be rewritten without the variable in the denominator to keep the model linear:
+$$ \sum_{s \in S} w_s \cdot (E_s + \Delta_s^+ - \Delta_s^-) \le 0.5 \cdot \sum_{s \in S} (E_s + \Delta_s^+ - \Delta_s^-) $$
+$$ \sum_{s \in S} (w_s - 0.5) \cdot (E_s + \Delta_s^+ - \Delta_s^-) \le 0 $$
+
+### c. Non-negativity
+
+The new exposure for each segment cannot be negative.
+$$ E_s + \Delta_s^+ - \Delta_s^- \ge 0 \quad \forall s \in S $$
+
+This is already implicitly handled by $\Delta_s^- \le E_s$ if we assume you can't originate and sell the same asset in the same period for a net loss. We can also add it for clarity.
+The decision variables themselves must be non-negative: $\Delta_s^+ \ge 0$ and $\Delta_s^- \ge 0$.
+
+I will create the final Rmd file for Task 4.

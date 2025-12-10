@@ -1,0 +1,81 @@
+---
+title: "Task 4: Data Concerns"
+output: html_document
+---
+
+This document flags potential data concerns for discussion with ABC Financial before proceeding with the optimization model.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+```
+
+```{r load-data}
+loan_profitability <- read_csv("../data/loan_profitability_per_quarter.csv")
+segment_means <- read_csv("../data/segment_profitability_means.csv")
+segment_means <- segment_means %>% rename(segment_quality = ...1)
+```
+
+## 1. Discrepancy in Profitability Data
+
+As noted in Task 1, we cannot recreate the `segment_profitability_means.csv` from the `loan_profitability_per_quarter.csv` file. This suggests that the quarterly data is aggregated and has lost segment-level details.
+
+**Question for ABC Financial:** Could you clarify how the `segment_profitability_means.csv` values were derived? Is there a more granular dataset available that links quarterly performance to specific segments? While we can proceed with the provided means, understanding the data lineage would increase confidence in the model.
+
+## 2. Negative Profitability in Some Segments
+
+Several segments show negative average profitability in the `segment_profitability_means.csv` file.
+
+```{r negative-profitability}
+negative_profitability_segments <- segment_means %>%
+  pivot_longer(cols = -segment_quality, names_to = "asset", values_to = "profitability") %>%
+  filter(profitability < 0)
+
+kable(negative_profitability_segments, caption = "Segments with Negative Average Profitability")
+```
+
+It is particularly noteworthy that some 'Prime' segments, which are typically considered low-risk, have negative profitability (e.g., InvestmentMortgage_Prime at `r segment_means %>% filter(segment_quality == 'Prime') %>% pull(InvestmentMortgage)`).
+
+**Questions for ABC Financial:**
+*   Is it expected that these segments are, on average, unprofitable?
+*   Could this be a data quality issue?
+*   If the data is correct, what is the business reason for holding these assets? Are there strategic benefits not captured by this profitability metric?
+
+## 3. Extreme Volatility in InvestmentMortgage Profitability
+
+The `InvestmentMortgage` asset class shows extreme fluctuations in its quarterly profitability.
+
+```{r im-volatility}
+im_summary <- loan_profitability %>%
+  summarise(
+    Min = min(InvestmentMortgage),
+    Max = max(InvestmentMortgage),
+    Mean = mean(InvestmentMortgage),
+    StdDev = sd(InvestmentMortgage)
+  )
+kable(im_summary, caption = "Summary Statistics for InvestmentMortgage Quarterly Profitability")
+
+im_plot <- ggplot(loan_profitability, aes(x = Quarter, y = InvestmentMortgage, group = 1)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Quarterly Profitability of InvestmentMortgage", y = "Profitability") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+print(im_plot)
+```
+
+The profitability of `InvestmentMortgage` has swung from `r im_summary$Min` to `r im_summary$Max`. The standard deviation is also very high compared to the mean.
+
+**Questions for ABC Financial:**
+*   Is this level of volatility typical for Investment Mortgages?
+*   Is using a simple average for such a volatile asset class appropriate? The average might not be a reliable indicator of future performance.
+*   Should we consider a different risk measure for this asset class, or perhaps treat it differently in the model (e.g., by applying a more conservative profitability estimate)?
+
+## 4. General Data Definitions
+
+The initial request mentioned an `average_profitability` column in `segments.csv`, which was not present. The profitability data was instead located in `segment_profitability_means.csv`. This is a minor issue, but it highlights the need for a clear data dictionary to avoid confusion.
+
+**Recommendation:** We should create and maintain a data dictionary that clearly defines each field in the datasets and how they are computed. This will be crucial for maintaining and updating the model in the future.
+
+These are the main data concerns to be addressed. Clarifying these points will ensure that the optimization model is built on a solid and well-understood foundation.

@@ -1,0 +1,179 @@
+---
+title: "ABC Financial Portfolio Optimization"
+format: pdf 
+---
+
+This document outlines the portfolio optimization model for ABC Financial, converted from the `abcfinancial.R` script.
+
+## Load Libraries
+
+This chunk loads the necessary R packages for the analysis.
+
+```{r}
+#| label: load-packages
+library(ompr)
+library(dplyr)
+library(ompr.roi)
+library(ROI.plugin.glpk)
+```
+
+## 1. Setup Data
+
+Here, we load the segment and asset data from CSV files and perform initial calculations.
+
+```{r}
+#| label: setup-data
+# Load data from CSV files
+segments_df <- read.csv("../data/segments.csv", stringsAsFactors = TRUE)
+assets_df <- read.csv("../data/assets.csv", stringsAsFactors = TRUE)
+profitability_df <- read.csv("../data/segment_profitability_means.csv", stringsAsFactors = TRUE)
+
+# Create identifiers
+segment_ids <- segments_df$segment_id
+asset_ids <- assets_df$asset
+
+# Add profitability to segments_df
+segments_df$profitability <- mapply(function(asset, seg_id) {
+  # extract "Prime", "Standard", etc. from "HomeLoan_Prime"
+  segment_quality <- sub(paste0(asset, "_"), "", seg_id)
+  if (asset %in% colnames(profitability_df) && segment_quality %in% rownames(profitability_df)) {
+    return(profitability_df[segment_quality, asset])
+  }
+  return(NA)
+}, segments_df$asset, segments_df$segment_id)
+segments_df$profitability[is.na(segments_df$profitability)] <- 0.0 # Default for safety
+
+# Create named vectors for use in the model
+profitability <- setNames(segments_df$profitability, segments_df$segment_id)
+cost_orig <- setNames(segments_df$rel_origination_cost, segments_df$segment_id)
+cost_sell <- setNames(segments_df$rel_sell_cost, segments_df$segment_id)
+exposure <- setNames(segments_df$exposure, segments_df$segment_id)
+risk_weight <- setNames(segments_df$risk_weight, segments_df$segment_id)
+max_inc <- setNames(assets_df$max_exposure_increase, assets_df$asset)
+max_dec <- setNames(assets_df$max_exposure_decrease, assets_df$asset)
+
+# Calculate aggregated current exposure per asset class for constraints
+asset_current_total <- segments_df %>%
+  group_by(asset) %>%
+  summarise(total_exp = sum(exposure)) %>%
+  { setNames(.$total_exp, .$asset) }
+
+total_portfolio_exposure <- sum(segments_df$exposure)
+```
+
+## 2. Declarative Modeling with OMPR
+
+This section defines the optimization model, including decision variables, the objective function, and all constraints.
+
+```{r}
+#| label: define-model
+
+model <- MIPModel() %>%
+  
+  # -- Decision Variables --
+  # x[i]: Target exposure for segment i
+  add_variable(x[i], type = "continuous", lb = 0, i = segment_ids) %>%
+  
+  # buy[i] and sell[i]: Auxiliary variables for transaction costs
+  add_variable(buy[i], type = "continuous", lb = 0, i = segment_ids) %>%
+  add_variable(sell[i], type = "continuous", lb = 0, i = segment_ids) %>%
+  
+  # -- Objective Function --
+  # Maximize Yield - Origination Costs - Selling Costs
+  set_objective(
+    sum_expr(x[i] * profitability[i], i = segment_ids) - 
+    sum_expr(buy[i] * cost_orig[i], i = segment_ids) - 
+    sum_expr(sell[i] * cost_sell[i], i = segment_ids), 
+    sense = "max"
+  ) %>%
+  
+  # -- Constraints --
+  
+  # 1. Flow Balance: Link Target Exposure to Trades
+  # x_new = x_old + buy - sell
+  add_constraint(
+    x[i] == exposure[i] + buy[i] - sell[i], 
+    i = segment_ids
+  ) %>%
+  
+  # 2. Regulatory Risk Weight Limit (Linearized)
+  # Sum(Exposure * Weight) <= 0.50 * Sum(Exposure)
+  add_constraint(
+    sum_expr(x[i] * (risk_weight[i] - 0.50), i = segment_ids) <= 0
+  ) %>%
+  
+  # 3. Global Growth Limit (Total portfolio <= 120% of current)
+  add_constraint(
+    sum_expr(x[i], i = segment_ids) <= 1.20 * total_portfolio_exposure
+  )
+```
+
+```{r}
+#| label: add-segment-constraints
+
+# 4 & 5. Asset Class Growth and Shrink Limits (added in a loop)
+for (a in asset_ids) {
+  # Get the list of segment ids for the current asset 'a'
+  current_asset_segments <- segments_df$segment_id[segments_df$asset == a]
+  
+  model <- model %>%
+    # Add the upper bound constraint for the asset class
+    add_constraint(
+      sum_expr(x[i], i = current_asset_segments) <= 
+      (1 + max_inc[a]) * asset_current_total[a]
+    ) %>%
+    # Add the lower bound constraint for the asset class
+    add_constraint(
+      sum_expr(x[i], i = current_asset_segments) >= 
+      (1 - max_dec[a]) * asset_current_total[a]
+    )
+
+}
+```
+
+## 3. Inspect and Solve Model
+
+Finally, we inspect the model structure and solve it. The `verbose = TRUE` argument will print the solver's progress.
+
+```{r}
+#| label: solve-model
+
+# Inspect the model structure
+model
+
+# Solve the model and store the result
+result <- solve_model(model, with_ROI(solver = "glpk", verbose = TRUE))
+
+# Extract and display the solution
+if (solver_status(result) %in% c("optimal", "success")) {
+  
+  # Get the new exposure values for each segment
+  solution_df <- get_solution(result, x[i]) %>%
+    rename(segment_id = i, new_exposure = value)
+  
+  # You can also extract values for 'buy' and 'sell' if needed
+  # buy_solution <- get_solution(result, buy[i])
+  # sell_solution <- get_solution(result, sell[i])
+  
+  # Join with original data for a clear, contextual view
+  final_df <- segments_df %>%
+    left_join(solution_df, by = "segment_id") %>%
+    select(segment_id, asset, exposure, new_exposure, profitability) %>%
+    mutate(
+      change = new_exposure - exposure,
+      profit_contribution = new_exposure * profitability
+    )
+  
+  print("Optimal Solution (New Exposure per Segment):")
+  print(final_df)
+  
+  cat("\n") # Add a newline for better formatting
+  
+  # Display the total objective value (maximized profit)
+  print(paste("Total Optimized Portfolio Profit:", round(objective_value(result), 2)))
+  
+} else {
+  print("No optimal solution found.")
+  print(paste("Solver status:", solver_status(result)))
+}
+```
