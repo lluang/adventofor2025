@@ -94,8 +94,11 @@ test_that("Objective function maximizes profit", {
   expect_true(solver_status(result) %in% c("optimal", "success"))
   
   solution <- get_solution_workaround(result, "x")
-  if (nrow(solution) > 0 && all(!is.na(solution$value))) {
-    expect_gt(solution$value[solution$i == "B_1"], data$exposure["B_1"])
+  
+  b1_solution_value <- solution$value[solution$i == "B_1"]
+  
+  if (length(b1_solution_value) > 0 && !is.na(b1_solution_value)) {
+    expect_gt(b1_solution_value, data$exposure["B_1"])
   }
 })
 
@@ -113,8 +116,8 @@ test_that("Flow balance constraint is respected", {
   
   expect_true(solver_status(result) %in% c("optimal", "success"))
 
-  buy_sol <- get_solution_workaround(result, "buy")
-  sell_sol <- get_solution_workaround(result, "sell")
+  buy_sol <- get_solution_workaround(result, "buy") %>% arrange(i)
+  sell_sol <- get_solution_workaround(result, "sell") %>% arrange(i)
   
   expect_equal(buy_sol$value, rep(10, 3))
   expect_equal(sell_sol$value, rep(0, 3))
