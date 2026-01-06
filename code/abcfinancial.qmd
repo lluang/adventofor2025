@@ -1,6 +1,6 @@
 ---
 title: "ABC Financial Portfolio Optimization"
-format: pdf 
+format: html 
 ---
 
 This document outlines the portfolio optimization model for ABC Financial, converted from the `abcfinancial.R` script.
@@ -26,7 +26,7 @@ Here, we load the segment and asset data from CSV files and perform initial calc
 # Load data from CSV files
 segments_df <- read.csv("../data/segments.csv", stringsAsFactors = TRUE)
 assets_df <- read.csv("../data/assets.csv", stringsAsFactors = TRUE)
-profitability_df <- read.csv("../data/segment_profitability_means.csv", stringsAsFactors = TRUE)
+profitability_df <- read.csv("../data/segment_profitability_means.csv", stringsAsFactors = TRUE, row.names = 1)
 
 # Create identifiers
 segment_ids <- segments_df$segment_id
@@ -67,6 +67,8 @@ This section defines the optimization model, including decision variables, the o
 
 ```{r}
 #| label: define-model
+# Source the constraints from the external script
+source("constraints.R")
 
 model <- MIPModel() %>%
   
@@ -79,56 +81,20 @@ model <- MIPModel() %>%
   add_variable(sell[i], type = "continuous", lb = 0, i = segment_ids) %>%
   
   # -- Objective Function --
-  # Maximize Yield - Origination Costs - Selling Costs
-  set_objective(
-    sum_expr(x[i] * profitability[i], i = segment_ids) - 
-    sum_expr(buy[i] * cost_orig[i], i = segment_ids) - 
-    sum_expr(sell[i] * cost_sell[i], i = segment_ids), 
-    sense = "max"
-  ) %>%
+  set_objective_net_profit(profitability, cost_orig, cost_sell, segment_ids) %>%
   
   # -- Constraints --
-  
-  # 1. Flow Balance: Link Target Exposure to Trades
-  # x_new = x_old + buy - sell
-  add_constraint(
-    x[i] == exposure[i] + buy[i] - sell[i], 
-    i = segment_ids
-  ) %>%
-  
-  # 2. Regulatory Risk Weight Limit (Linearized)
-  # Sum(Exposure * Weight) <= 0.50 * Sum(Exposure)
-  add_constraint(
-    sum_expr(x[i] * (risk_weight[i] - 0.50), i = segment_ids) <= 0
-  ) %>%
-  
-  # 3. Global Growth Limit (Total portfolio <= 120% of current)
-  add_constraint(
-    sum_expr(x[i], i = segment_ids) <= 1.20 * total_portfolio_exposure
-  )
+  add_flow_balance_constraint(exposure, segment_ids) %>%
+  add_portfolio_risk_weight_constraint(risk_weight, segment_ids) %>%
+  add_global_growth_constraint(total_portfolio_exposure, segment_ids)
+
 ```
 
 ```{r}
 #| label: add-segment-constraints
+# Asset Class Growth and Shrink Limits
+model <- add_asset_exposure_constraints(model, segments_df, asset_ids, max_inc, max_dec, asset_current_total)
 
-# 4 & 5. Asset Class Growth and Shrink Limits (added in a loop)
-for (a in asset_ids) {
-  # Get the list of segment ids for the current asset 'a'
-  current_asset_segments <- segments_df$segment_id[segments_df$asset == a]
-  
-  model <- model %>%
-    # Add the upper bound constraint for the asset class
-    add_constraint(
-      sum_expr(x[i], i = current_asset_segments) <= 
-      (1 + max_inc[a]) * asset_current_total[a]
-    ) %>%
-    # Add the lower bound constraint for the asset class
-    add_constraint(
-      sum_expr(x[i], i = current_asset_segments) >= 
-      (1 - max_dec[a]) * asset_current_total[a]
-    )
-
-}
 ```
 
 ## 3. Inspect and Solve Model
